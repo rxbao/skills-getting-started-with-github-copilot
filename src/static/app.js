@@ -4,7 +4,31 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
   const messageDiv = document.getElementById("message");
 
-  // Function to fetch activities from API
+  // Function to unregister a participant
+  async function unregisterParticipant(activityName, email) {
+    try {
+      const response = await fetch(
+        `/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`,
+        {
+          method: "POST",
+        }
+      );
+
+      const result = await response.json();
+
+      if (response.ok) {
+        // Refresh activities
+        fetchActivities();
+      } else {
+        alert(result.detail || "An error occurred");
+      }
+    } catch (error) {
+      alert("Failed to unregister. Please try again.");
+      console.error("Error unregistering:", error);
+    }
+  }
+
+  // Function to fetch and display activities
   async function fetchActivities() {
     try {
       const response = await fetch("/activities");
@@ -12,6 +36,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+
+      // Clear and reset activity select dropdown
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -25,6 +52,10 @@ document.addEventListener("DOMContentLoaded", () => {
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <p><strong>Participants:</strong></p>
+          <ul>
+            ${details.participants.map(p => `<li>${p} <button class="delete-btn" data-activity="${name}" data-email="${p}">×</button></li>`).join('')}
+          </ul>
         `;
 
         activitiesList.appendChild(activityCard);
@@ -41,7 +72,18 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Handle form submission
+  // Handle delete button clicks
+  activitiesList.addEventListener("click", (event) => {
+    if (event.target.classList.contains("delete-btn")) {
+      const activityName = event.target.dataset.activity;
+      const email = event.target.dataset.email;
+      if (confirm(`Are you sure you want to unregister ${email} from ${activityName}?`)) {
+        unregisterParticipant(activityName, email);
+      }
+    }
+  });
+
+  // Handle signup form submission
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
 
@@ -62,6 +104,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // Refresh activities to show updated participant count
+        fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
